@@ -1,0 +1,198 @@
+var apellidoCol,nombreCol,dniCol,resolucionCol,soporteCol;
+  apellidoCol = 1;
+  nombreCol = 2;
+  dniCol = 3;
+  mailCol = 6  
+  resolucionCol = 11;
+  soporteCol = 12;  
+var sheetReferenciaCruce;  
+  
+//--------------------------------------------------------------RUTINA PARA GENERAR "REFERENCIA CRUCE"--------------------------------------------------------------
+function generarReferenciaCruce(file) {
+try {
+ //genereo un "consolidado" con todos los estudiantes QUE IRÍAN AL MOODLE
+ var fileId = file.getId();
+ var open = SpreadsheetApp.openById(fileId);
+ var planilla = open.getSheetByName('Resumen').getRange('A9:AS').getValues();
+ var sec = open.getSheetByName('ESTUDIANTES').getRange('B15').getValue();
+ var url = file.getUrl();
+ var array = [];
+ 
+ //iteraciones por planilla
+ for (var n in planilla){
+  var rw = planilla[n]; //entrada individual de estudiante
+  
+   if (rw[0] === '') {continue} //line en blanco, saltear
+  //resolucion,soporte
+   var resolucion = rw[resolucionCol]; var res = resolucion.toString().replace(/\D/g,'').substring(0,3);
+   var soporte = rw[soporteCol].toString();
+  //conviero cuil/dni a dni y verifico
+   var cuilDni = (rw[dniCol].toString()).replace(/\D/g,'');    //solo valores numericos;
+   var first = cuilDni.substring(0,1); var med = cuilDni.substring(2,3); var len = cuilDni.length;
+    if (len === 8 && (first <= 4 || first == 9))  {var dni = cuilDni}
+    else if (len === 7 && first >= 4)             {var dni = cuilDni}
+    else if (len === 11 && (med <= 4 || med == 9)){var dni = cuilDni.substring(2,10)}
+    else if (len === 10 && med >= 4)              {var dni = cuilDni.substring(2,9)}
+    else                                          {var dni = 'invalid'}
+  //apellido,nombre,email,regexp(para validar el mail),rol
+   var apellido = rw[apellidoCol];
+   var nombre = rw[nombreCol];
+   var email = rw[mailCol];
+   var emailValidation = /\S+@\S+\.\S+/;
+   var rol = 'student';
+   
+  //SI EL DNI ES VALIDO, LA RESOLUCION ES 106 Y EL SOPORTE ES VIRTUAL: LE ASIGNO LOS INICIOS                                                      (validacion de mail suspendida)
+   if (dni !== 'invalid' && email != '' && res == 106 && soporte == 'VIRTUAL') { var check = true;                                          // && emailValidation.test(email) === true
+    var mods = []; for (var col=13;col<45;col++) { var mod = rw[col];if (mod.substring(0,6) == 'INICIO' && mod != 'INICIO MAR/20') {mods.push(campModules[col-13] + ' - S' +sec)}}
+   array.push([url,sec,resolucion,soporte,cuilDni,dni,dni,apellido,nombre,email,mods[0],rol,mods[1],rol,mods[2],rol,mods.length]);
+   }
+ } 
+ 
+ var lastRw = sheetReferenciaCruce.getLastRow();    
+//Si hay estudiantes nominalizados 
+ if (array.length > 0){
+  sheetReferenciaCruce.getRange(lastRw + 1, 1, array.length, array[0].length).setValues(array); //vuelco las entradas tratadas a la "Referencia Cruce"
+  var results_row = [open.getName(),open.getUrl(),'Done.']
+ }
+//Si NO hay estudiantes nominalizados  
+ else { var results_row = [open.getName(),open.getUrl(),'No, planilla sin estudiantes para moodle o vacía.']}
+  return results_row 
+   }
+catch (e) {
+   var results_row = [open.getName(),open.getUrl(),e.message];
+   PropertiesService.getUserProperties().setProperty('ERROR_COUNTER', parseInt(PropertiesService.getUserProperties().getProperty('ERROR_COUNTER')) + 1)
+   return results_row
+   }
+}
+//-------------------------------FUNCION AUXILIAR-------------------------------
+//SPREADSHEET DESTINO
+   //genera la planilla
+function generarPlanillaReferenciaCruce(){                                                
+  var folder = dapp.getFolderById('1YWKEX3ZxH5fAcRrHXw2KtTpxCJwzQzc8');
+  var modelo = dapp.getFileById('1XAKeetrnJkZnnwEYwgQaqeHT3cDQwPcDkSG0gXaXJ5o');
+  var copy = modelo.makeCopy('Referencia Cruce - Drive Vs Mdl '+ date, folder);
+  dapp.getFileById(copy.getId()).addViewer('modalidadadistancia.adultos@gmail.com'); //comparto vista con distancia
+    sheet.getRange('D13').setValue(copy.getUrl());
+    openListado = sapp.openByUrl(copy.getUrl());
+    sheetReferenciaCruce = openListado.getSheetByName('Listado moodle');}
+    //referencia a la planilla genera
+function abrirPlanillaReferenciaCruce(){
+    openListado = sapp.openByUrl(sheet.getRange('D13').getValue());
+    sheetReferenciaCruce = openListado.getSheetByName('Listado moodle');}
+    
+    
+//--------------------------------------------------------------CRUCE DE DRIVE VS MOODLE-------------------------------------------------------------- 
+ //una vez generada la planilla de referencia (contiene todos los estudiantes del drive que deberían ir al moodle y sus caracteristicas), cruzo esa info con la del "reporte del moodle" 
+var mdldniCol,mdlapellidoCol,mdlnombreCol,mdlsecCol,mdlmoduloCol,mdlrolCol,mdlmailCol,mdllinklCol,mdlacceso1Col,mdlacceso2Col;
+ mdldniCol = 6;
+ mdlapellidoCol = 7;
+ mdlnombreCol = 8;
+ mdlsecCol = 1;
+ mdlmoduloCol = 3;
+ mdlrolCol = 5;
+ mdlmailCol = 9;
+ mdllinklCol = 4;
+ mdlacceso1Col = 10;
+ mdlacceso2Col = 11;
+
+function  cruceDriveMdl(){
+ abrirPlanillaReferenciaCruce();
+ var reporteId = PropertiesService.getUserProperties().getProperty('GLOBAL_AUX');//almacenado como variable global, del picker 
+ var reporte = sapp.openById(reporteId).getDataRange().getValues(); 
+ var consolidado = sheetReferenciaCruce.getDataRange().getValues();
+ 
+ //Hago la copia del "informe modelo"
+ var folder = dapp.getFolderById('1j2FY2dMp8kgcqj3TVWMtw0Tw6vu38Tct');
+ var model = dapp.getFileById('16apAdgqr0TzDoQNaufcfNXGZpX6oHw4Wzsbash9sp9s');
+ var copy = model.makeCopy('Informe - Drive Vs Mdl '+ date, folder)
+ var copyUrl = copy.getUrl();
+ var openCopy = sapp.openByUrl(copyUrl);
+ dapp.getFileById(copy.getId()).addViewer('modalidadadistancia.adultos@gmail.com'); //comparto vista con distancia
+ 
+ //variables generales
+ var arrayEst = []; /**/ var arrayDoc = []; /**/  var arrayAct = [];
+ var EstMods = [];  /**/ var DocMods = [];  /**/  var ActMods = [];
+ var EstMails = []; var EstDni = []; var EstOnlyMails = []; //variables auxiliares 
+ 
+//-----------------PROCESO-----------------
+ //separo todo el reporte del mdl en 3 arrays: estudiantes, docentes y actores
+ for (var i in reporte){
+  var reporteRw = reporte[i];
+  //-estudiantes
+  if (reporteRw[mdlrolCol] == 'ESTUDIANTE'){
+   arrayEst.push([reporteRw[mdlrolCol],reporteRw[mdldniCol],reporteRw[mdlsecCol],reporteRw[mdlapellidoCol],reporteRw[mdlnombreCol],reporteRw[mdlmailCol],reporteRw[mdlmoduloCol],reporteRw[mdllinklCol],reporteRw[mdlacceso1Col],reporteRw[mdlacceso2Col]]);
+   var mdlModulo = ((reporteRw[mdlmoduloCol].toString()).replace('(A)','').replace('(B)','')).trim();
+   EstMods.push(reporteRw[mdldniCol].toString().trim() + '|' + mdlModulo + ' - S' + reporteRw[mdlsecCol].toString().trim());  //join de dni y modulo del mdl
+   EstMails.push(reporteRw[mdldniCol].toString().trim() + '|' + (reporteRw[mdlmailCol].toString().trim()).toLowerCase());     //join de dni y mail del mdl
+   EstDni.push(reporteRw[mdldniCol].toString().trim());                                                                       //unidimensional de dnis
+  } 
+ }
+  //-Del consolidado pre procesado del drive armo un listado de inicios y su información complementaria
+ var DriveMods = []; var DriveMails = []; var DriveDni = []; var DriveAux = []; var DriveOnlyMails = [];
+ consolidado.shift(); //saco los encabezados
+ for (var j in consolidado){ //itero sobre el consolidado ya procesado
+  var consolidadoRw = consolidado[j];
+  if (consolidadoRw[5] != 'invalid') { //si el dni es invalido
+   var mail = (consolidadoRw[9].toString().trim()).toLowerCase(); //minusc y trim de mail
+   if (consolidadoRw[10] != 'undefined') {DriveMods.push(consolidadoRw[5] + '|' + consolidadoRw[10]) ;DriveAux.push(j)} //1er inicio
+   if (consolidadoRw[12] != 'undefined') {DriveMods.push(consolidadoRw[5] + '|' + consolidadoRw[12]) ;DriveAux.push(j)} //2do inicio
+   if (consolidadoRw[14] != 'undefined') {DriveMods.push(consolidadoRw[5] + '|' + consolidadoRw[14]) ;DriveAux.push(j)} //3er inicio
+   DriveMails.push(consolidadoRw[5] + '|' + mail);   //join unidimensional de dni y mail
+   DriveDni.push(consolidadoRw[5].toString());       //unidimensional de dni
+   DriveOnlyMails.push(mail);                        //unidimensional de mails
+   }
+ }
+//-Estudiantes Duplicados Drive
+ var unique = []; var dupPosAux = []; var dupPos = [];
+    //Primero armo un array con las posiciones de los dni duplicados, relativas : "dupPos"
+ for (var k in DriveDni){var thisDni =  DriveDni[k]; var ind = unique.indexOf(thisDni); if (ind === -1) {unique.push(thisDni); dupPosAux.push(k)} else {dupPos.push(k,dupPosAux[ind])}}
+ var cleanUnique = [];
+    //Limpio "dupPos" de sus entradas duplicadas, habia ingresado los duplicados de a pares, en caso de repetirse un dni mas de 2 veces duplicaría entrada
+ for (var l in dupPos)  {var thisPos =  dupPos[l]; var ind = cleanUnique.indexOf(thisPos); if (ind === -1) {cleanUnique.push(thisPos)}}
+//-Mails Duplicados Drive, analogo de dnis
+ var uniqueM = []; var dupPosAuxM = []; var dupPosM = [];
+    //Primero armo un array con las posiciones de los dni duplicados, relativas : "dupPos"
+ for (var k in DriveOnlyMails){var thisMail =  DriveOnlyMails[k]; var ind = uniqueM.indexOf(thisMail); if (ind === -1) {uniqueM.push(thisMail); dupPosAuxM.push(k)} else {dupPosM.push(k,dupPosAuxM[ind])}}
+ var cleanUniqueM = [];
+    //Limpio "dupPos" de sus entradas duplicadas, habia ingresado los duplicados de a pares, en caso de repetirse un dni mas de 2 veces duplicaría entrada
+ for (var l in dupPosM)  {var thisPos =  dupPosM[l]; var ind = cleanUniqueM.indexOf(thisPos); if (ind === -1) {cleanUniqueM.push(thisPos)}}
+    //cruzo las posiciones de los mails con los dni duplicados
+ var uniqueMails = [];  for (var ll in cleanUniqueM) { if (cleanUnique.indexOf(cleanUniqueM[ll]) == -1){uniqueMails.push(cleanUniqueM[ll])}}   
+
+ //------------RESULTADOS------------
+ var Dup = []; var DriveMiss = []; var MoodleMiss = []; var MailMiss = []; var DniMiss = []; var DupMail = [];
+ // -Modulos, Drive
+ for (var m in DriveMods)  {if (EstMods.indexOf(DriveMods[m]) === -1)  { //Si no encuentro la combinación DNI-MODULO: continua
+  var DModsSplit = DriveMods[m].split('|'); var ref = DriveAux[m];
+  DModsSplit.unshift(consolidado[ref][1],consolidado[ref][7],consolidado[ref][8],consolidado[ref][9],consolidado[ref][4]); //agrego información complementaria
+  DriveMiss.push(DModsSplit)}}
+ // -Modulos, Mdl 
+ for (var n in EstMods)    {if (DriveMods.indexOf(EstMods[n]) === -1)  { //Si no encuentro la combinación DNI-MODULO: continua
+  var MdlModsSplit = EstMods[n].split('|');
+  MdlModsSplit.unshift(arrayEst[n][2],arrayEst[n][3],arrayEst[n][4],arrayEst[n][5]); //agrego información complementaria
+  MdlModsSplit.push(arrayEst[n][7],arrayEst[n][8],arrayEst[n][9]);                   //agrego información complementaria
+  MoodleMiss.push(MdlModsSplit) }}
+ // -Usuarios y Mails
+ for (var o in DriveMails) {if (EstMails.indexOf(DriveMails[o]) === -1){ //Si no encuentro la combinación DNI-MAIL prosigo
+  var DMailSplit = DriveMails[o].split('|');
+  var ind = EstDni.indexOf(DMailSplit[0]);                                                     //busco sólo el DNI
+  DMailSplit.unshift(consolidado[o][1],consolidado[o][7],consolidado[o][8],consolidado[o][4]); //agrego información complementaria
+  if (ind === -1) {DniMiss.push(DMailSplit)}                                                   //Resultado: DNI no encontrado   
+  else {DMailSplit.push(arrayEst[parseInt(ind)][5]) ; MailMiss.push(DMailSplit)}}}             //Resultado: DNI encontrado, mail distinto
+ // -DNIs Duplicados Drives
+ for (var s in cleanUnique){var t = cleanUnique[s]; Dup.push([consolidado[t][1],consolidado[t][4],consolidado[t][5],consolidado[t][7],consolidado[t][8],consolidado[t][9]])}
+ // -MAILs Duplicados Drives
+ for (var s in uniqueMails){var t = uniqueMails[s]; DupMail.push([consolidado[t][1],consolidado[t][4],consolidado[t][5],consolidado[t][7],consolidado[t][8],consolidado[t][9]])}
+ 
+ //Vuelco la info procesada en el reporte en caso de que corresponda
+ if (Dup.length > 0)       {openCopy.getSheetByName('1. DNIs duplicados, Drive').getRange(3,1,Dup.length,Dup[0].length).setValues(Dup)}
+ if (DupMail.length > 0)   {openCopy.getSheetByName('2. Mails duplicados, Drive').getRange(3,1,DupMail.length,DupMail[0].length).setValues(DupMail)}
+ if (DniMiss.length > 0)   {openCopy.getSheetByName('3. Usuarios').getRange(3,1,DniMiss.length,DniMiss[0].length).setValues(DniMiss)}
+ if (MailMiss.length > 0)  {openCopy.getSheetByName('4. Vs. Mails').getRange(3,1,MailMiss.length,MailMiss[0].length).setValues(MailMiss)}
+ if (DriveMiss.length > 0) {openCopy.getSheetByName('5. Modulos, Drive').getRange(3,1,DriveMiss.length,DriveMiss[0].length).setValues(DriveMiss)}
+ if (MoodleMiss.length > 0){openCopy.getSheetByName('6. Modulos, Mdl').getRange(3,1,MoodleMiss.length,MoodleMiss[0].length).setValues(MoodleMiss)}
+ 
+ sheet.getRange('D14').setValue(copyUrl); //pongo el link del informe en la solapa 'Operaciones' 
+ PropertiesService.getUserProperties().deleteProperty('GLOBAL_AUX'); //borro el id almacenado del reporte mdl 
+ } 
+ 
