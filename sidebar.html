@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+  </head>
+<body>
+  
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons.css">
+    
+  <div style="text-align:center; margin-top:10px">
+
+  <div>Archivos procesados:</div>
+
+  <div id="cant">0</div>
+  
+<br>
+
+  <button id="Botón" class="blue" onclick="ejecutar()">{main_button}</button>
+
+<div id="par1" class="secondary">Esperando ejecución. Cerrar la ventana para detener el Script.</div>
+
+<br>
+
+  <div id="div">{disp}</div>
+  
+  {reset_button}
+
+</div>
+
+<script>
+  function ejecutar() {
+    document.getElementById("Botón").disabled = true;
+    document.getElementById("par1").innerHTML="Ejecución en curso. Cerrar la ventana para detener el Script."; 
+    google.script.run
+     .withSuccessHandler(onSuccess)
+     .withFailureHandler(onFailure)
+     .fileIterator();
+  }
+  function reset() {
+    google.script.run
+                 .withSuccessHandler(function (){google.script.run.startFI()})
+                 .hard_reset();
+  }
+//Verifco el valor del token
+  function onSuccess(continuationToken){
+    if(continuationToken === undefined){ //token esta indefinido, termina operacion
+      google.script.run.withSuccessHandler(callbackCounter).writeSomething();
+      document.getElementById("par1").innerHTML="Finalizó la operación solicitada."; 
+    }
+    else if (continuationToken === 'OPERACION_ADICIONAL'){ //para operaciones adicionales, sólo para Cruce mdl por ahora
+      google.script.run.withSuccessHandler(callbackCounter).writeSomething();
+      document.getElementById("par1").innerHTML="Finalizó la iteración sobre las planillas. Ejecutando operación adicional.";
+      google.script.run
+                   .withSuccessHandler(function (){document.getElementById("par1").innerHTML="Finalizó la operación solicitada.";google.script.run.reset_token})
+                   .withFailureHandler(onFailure)
+                   .cruceDriveMdl();
+    }
+    else { //token no esta indefinido, sigue operacion
+      google.script.run.withSuccessHandler(callbackCounter).writeSomething();
+      google.script.run
+                   .withSuccessHandler(onSuccess)
+                   .withFailureHandler(onFailure)
+                   .fileIterator(continuationToken);
+    }
+  }
+  function onFailure(error){
+     document.getElementById("par1").innerHTML= '';
+     document.getElementById("div").innerHTML= error;
+  }
+//Vuelco el contador  
+function callbackCounter(whatToWrite) {
+  document.getElementById("cant").innerHTML=whatToWrite;
+}
+</script>
+  </body>
+</html>
