@@ -1,6 +1,6 @@
 # durin.GoogleAppScripts
 
-#Sheets API & Drive API
+#Sheets API & Drive API.
 Proyect is supposed to be bound to Google Spreadsheet for input.
 Sample Google SpreadSheet: https://docs.google.com/spreadsheets/d/16DfVnxwY4tTZII4ply32hBQBD-tDbKFHIDpEL9ukgIU/edit
 Standalone Proyect link: https://script.google.com/d/1CqlEJrlwaipUYkP_tlJJvHBsJjgSjUzLWEIiT4r4Ucxh7gWToIC0MeJw/edit?usp=drive_web
