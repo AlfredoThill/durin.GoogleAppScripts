@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons.css">
+  <script type="text/javascript">
+    var DIALOG_DIMENSIONS = { width: 600, height: 425};
+    var pickerApiLoaded = false;
+     // Use the API Loader script to load google.picker, run for token 
+    function onApiLoad() {
+        gapi.load('picker', {'callback': function() { pickerApiLoaded = true } });
+        google.script.run.withSuccessHandler(createPicker)
+                         .withFailureHandler(showError)
+                         .getOAuthToken();
+    }
+//-------------------Create Picker-------------------
+    function createPicker(token) {
+        if (pickerApiLoaded && token) { //if picker loaded and got token...
+            //create custom view
+            var docsView = new google.picker.DocsView()
+                .setParent('1Imh-CyZsuoaHRBtUSc2tC8cqq0oxoFBc')            //starting location: "Reportes Moodle"
+                .setMimeTypes('application/vnd.google-apps.spreadsheet');  //display type
+            //builder
+            var picker = new google.picker.PickerBuilder()
+                .addView(docsView)
+                .enableFeature(google.picker.Feature.NAV_HIDDEN)
+                .hideTitleBar()
+                .setSize(DIALOG_DIMENSIONS.width - 2, DIALOG_DIMENSIONS.height - 2)
+                .setOAuthToken(token)
+                .setCallback(pickerCallback)
+                .setOrigin('https://docs.google.com')  
+                .build();      
+            //show
+            picker.setVisible(true);
+            //inner error
+        } else { showError('Unable to load the file picker.') }
+    }
+//-------------------Call Back-------------------
+    function pickerCallback(data) {
+        var action = data[google.picker.Response.ACTION];
+        if (action == google.picker.Action.PICKED) {             //if something got picked, get id and global store it
+            var doc = data[google.picker.Response.DOCUMENTS][0];
+            var id = doc[google.picker.Document.ID];
+//            document.getElementById('result').innerHTML = id;
+            google.script.run.saveVariable(id);
+            google.script.host.close();
+        } else if (action == google.picker.Action.CANCEL) {      //if CANCEL, close
+            google.script.host.close();
+        }
+    }
+
+    function showError(message) { document.getElementById('result').innerHTML = 'Error: ' + message }
+  </script>
+</head>
+
+<body>
+    <div>
+        <p id='result'></p>
+    </div>
+    <script type="text/javascript" src="https://apis.google.com/js/api.js?onload=onApiLoad"></script>
+</body>
+</html>
